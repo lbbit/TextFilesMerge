@@ -15,30 +15,7 @@ key_list = ["sk-key1",
 
 completed_folders = []
 
-def semantic_sort2(chapters):
-    prompt = f"给定以下小说章节标题列表:\n{chapters}\n请按照合适的顺序对其进行排序,输出结果不包含引号逗号，用换行分隔,不要输出额外信息:\n"
-    client = OpenAI(
-        # defaults to os.environ.get("OPENAI_API_KEY")
-        api_key=random.choice(key_list),
-    )
-    try:
-        response = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt,
-                }
-            ],
-            model="gpt-3.5-turbo",
-        )
-    except Exception as e:
-        print(f"OpenAI API call failed: {e}")
-        return None
-    sorted_chapters = response.choices[0].message.content.split('\n')
-    # print(f"debug: sort result: {sorted_chapters}")
-    return sorted_chapters
-
-def semantic_sort(chapters):
+def semantic_sort3(chapters):
     prompt = f"给定以下小说章节标题列表:\n{chapters}\n请按照合适的顺序对其进行排序,如果标题中含有序号优先按序号顺序排序,输出结果不包含引号逗号,禁止修改原标题的内容,用换行分隔,不要输出额外信息:\n"
     openai.api_key = random.choice(key_list)
     client = OpenAI(api_key=openai.api_key)
@@ -46,7 +23,6 @@ def semantic_sort(chapters):
         response = client.completions.create(
             model="text-davinci-002",
             prompt=prompt,
-            max_tokens=1024,
             stream=False,
             n=1,
             stop=None,
@@ -57,8 +33,32 @@ def semantic_sort(chapters):
         return None
 
     sorted_chapters = response.choices[0].text.strip().split('\n')
+    # 使用列表推导式过滤掉空白字符串
+    filtered_list = [string for string in sorted_chapters if string.strip() != '']
     # print(f"debug: sort result: {sorted_chapters}")
-    return sorted_chapters
+    return filtered_list
+def semantic_sort(chapters):
+    prompt = f"给定以下小说章节标题列表:\n{chapters}\n请按照合适的顺序对其进行排序,如果标题中含有序号优先按序号顺序排序,用换行分隔,禁止修改输入标题的内容,不要输出额外信息:\n"
+    openai.api_key = random.choice(key_list)
+    client = OpenAI(api_key=openai.api_key)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+            stream=False,
+            n=1,
+            stop=None,
+        )
+    except Exception as e:
+        print(f"OpenAI API call failed: {e}")
+        return None
+
+    sorted_chapters = response.choices[0].message.content.strip().split('\n')
+    # 使用列表推导式过滤掉空白字符串
+    filtered_list = [string for string in sorted_chapters if string.strip() != '']
+    # print(f"debug: sort result: {sorted_chapters}")
+    return filtered_list
 
 def concat_txt_in_dir(folder_path, output_dir):
     folder = os.path.basename(folder_path)
@@ -77,6 +77,7 @@ def concat_txt_in_dir(folder_path, output_dir):
         sorted_files = semantic_sort(txt_files)
         if sorted_files:
             break
+        time.sleep(1)
     else:
         print(f'Skipping folder {folder} after 3 failed sorts')
         return
@@ -85,6 +86,7 @@ def concat_txt_in_dir(folder_path, output_dir):
     txt_path = ''
     try:
         for txt_file in sorted_files:
+            txt_file = txt_file.replace(",", "")
             txt_file = txt_file.replace("'", "")
             txt_path = os.path.join(folder_path, txt_file)
             with open(txt_path, 'rb') as input_file:
@@ -109,7 +111,14 @@ def concat_txt_in_dir(folder_path, output_dir):
             f.write('\n'.join(completed_folders))
         print(f'Completed concatenation for {folder}')
     except Exception as e:
-        print(f"File opeartion failed: {e}, filename:{folder}, txt_path: {txt_path}")
+        print(f"File opeartion failed: {e}, filename:{folder}, txt_path: {txt_path}, sortfiles:{sorted_files}")
+        try:
+            # 尝试删除文件
+            os.remove(output_path)
+            print(f"File {output_path} deleted successfully.")
+        except OSError as e:
+            # 如果删除失败，输出错误信息
+            print(f"Error deleting file {output_path}: {e}")
 
 if __name__ == '__main__':
     # output dir
