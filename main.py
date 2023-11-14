@@ -132,4 +132,4 @@ if __name__ == '__main__':
                 folder_path = os.path.join(input_dir, folder)
                 if not os.path.isdir(folder_path):
                     continue
-                concat_txt_in_dir(folder_path, output_dir)
+                executor.submit(concat_txt_in_dir, folder_path, output_dir)
